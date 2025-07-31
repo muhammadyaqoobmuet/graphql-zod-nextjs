@@ -3,8 +3,18 @@ import { GraphQLError } from "graphql";
 import * as z from "zod";
 
 import bcrypt from "bcryptjs";
-// creating zod schame
+import { createToken } from "./lib/userAtuhentications";
+import { tr } from "zod/v4/locales";
 
+// Enums must be declared before use
+enum IssueStatus {
+  BACKLOG = "BACKLOG",
+  TODO = "TODO",
+  INPROGRESS = "INPROGRESS",
+  DONE = "DONE",
+}
+
+// creating zod schame
 const userCreateSchema = z.object({
   email: z.string().email("Please provide a valid email address"),
   password: z
@@ -18,41 +28,187 @@ const userLoginSchema = z.object({
     .min(2, { message: "min 2 character are required for password" }),
 });
 
+const createIssueSchema = z.object({
+  name: z.string().min(1, "Issue name is required"),
+  content: z.string().min(1, "Issue content is required"),
+  status: z.nativeEnum(IssueStatus),
+});
+
+interface CreateIssueInput {
+  name: string;
+  content: string;
+  status: IssueStatus;
+}
 interface AuthInput {
   email: string;
   password: string;
 }
 
+interface Project {
+  id: string;
+  createdAt: string;
+  name: string;
+  content: string;
+  userId: string;
+}
+
 interface User {
   email: string;
   createdAt: string;
+  token?: string;
   issues: Issue[];
+  projects: Project[];
 }
 
 interface Issue {
   id: string;
   createdAt: string;
   userId: string;
-  status: string;
+  status: IssueStatus;
   content: string;
   name: string;
+  user: User;
 }
 
 export const resolver = {
   Query: {
+    Issues: async (_, args, ctx: any): Promise<Issue[]> => {
+      // first check is this user authorized
+      try {
+        if (!ctx.user && !ctx.user.email) {
+          throw new GraphQLError("UN_AUTHORIZED", {
+            extensions: { code: "UNAUTHORIZED" },
+          });
+        }
+
+        const email = ctx.user.email;
+
+        const doesUserExits = await prisma.user.findUnique({
+          where: {
+            email,
+          },
+          include: {
+            issues: true,
+          },
+        });
+        if (!doesUserExits) {
+          throw new GraphQLError("User does not exists", {
+            extensions: { code: "USER_NOT_FOUND" },
+          });
+        }
+        console.log(doesUserExits.issues);
+        return doesUserExits.issues.map((issue) => issue as Issue);
+      } catch (error) {
+        console.error("Error fetching user issues:", error);
+
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred";
+        throw new GraphQLError(errorMessage, {
+          extensions: { code: "INTERNAL_SERVER_ERROR" },
+        });
+      }
+    },
     hello: (): string => "Hello World!",
-    me: (): User => {
-      return {
-        email: "test@example.com",
-        createdAt: new Date().toISOString(),
-        issues: [],
-      };
+    // me: (_, _, ctx: any): User => {
+    //   return ctx.user;
+    // },
+    loginUser: async (
+      _parent: unknown,
+      { input }: { input: AuthInput },
+
+      ctx: any
+    ): Promise<User> => {
+      try {
+        console.log({ input });
+        // Fixed: Use userLoginSchema instead of userCreateSchema
+        const zodResult = userLoginSchema.safeParse({
+          email: input.email,
+          password: input.password,
+        });
+
+        if (!zodResult.success) {
+          const errorMessages = zodResult.error.issues
+            .map((issue) => issue.message)
+            .join(", ");
+          throw new GraphQLError(`Validation failed: ${errorMessages}`, {
+            extensions: {
+              code: "INVALID_INPUT",
+              validationErrors: zodResult.error.issues,
+            },
+          });
+        }
+
+        // check first if user exits or not
+        const existsUser = await prisma.user.findUnique({
+          where: {
+            email: input.email,
+          },
+        });
+
+        if (!existsUser) {
+          throw new GraphQLError(
+            "User does not exists try again with new email or password",
+            {
+              extensions: {
+                code: "USER_NOT_FOUND",
+              },
+            }
+          );
+        }
+
+        // Fixed: Await the bcrypt.compare promise
+        const passwordMatch = await bcrypt.compare(
+          input.password,
+          existsUser.password
+        );
+        if (!passwordMatch) {
+          throw new GraphQLError("Invalid Credentials", {
+            extensions: {
+              code: "INVALID_CREDENTIALS",
+            },
+          });
+        }
+
+        // create token
+        const token = createToken({ email: input.email });
+
+        return {
+          email: existsUser.email,
+          createdAt: existsUser.createdAt.toISOString(),
+          token,
+          issues: [],
+          projects: [],
+        };
+      } catch (error) {
+        console.log(
+          error instanceof Error ? error.message : "Unknown error occurred"
+        );
+
+        // If it's already a GraphQLError, rethrow it
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+
+        // Handle other types of errors
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred";
+        throw new GraphQLError(errorMessage, {
+          extensions: {
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        });
+      }
     },
   },
   Mutation: {
     createUser: async (
       _parent: unknown,
-      { input }: { input: AuthInput }
+      { input }: { input: AuthInput },
+      ctx: any
     ): Promise<User> => {
       // create a user
       try {
@@ -75,7 +231,6 @@ export const resolver = {
         }
 
         // check first if user exits or not
-
         const existsUser = await prisma.user.findUnique({
           where: {
             email: input.email,
@@ -94,9 +249,7 @@ export const resolver = {
         }
 
         // create user
-
-        // enctpy password
-
+        // encrypt password
         const passwordEnc = bcrypt.hashSync(input.password, 10);
         const result = await prisma.user.create({
           data: {
@@ -105,13 +258,111 @@ export const resolver = {
           },
         });
 
+        // create token
+        const token = createToken({ email: input.email });
+
         return {
           email: result.email,
           createdAt: result.createdAt.toISOString(),
+          token,
           issues: [],
+          projects: [],
         };
       } catch (error) {
         console.log(
+          error instanceof Error ? error.message : "Unknown error occurred"
+        );
+
+        // If it's already a GraphQLError, rethrow it
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+
+        // Handle other types of errors
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred";
+        throw new GraphQLError(errorMessage, {
+          extensions: {
+            code: "INTERNAL_SERVER_ERROR",
+          },
+        });
+      }
+    },
+    createIssue: async (
+      _parent: unknown,
+      { input }: { input: CreateIssueInput },
+      ctx: { user?: { email: string } }
+    ): Promise<Issue> => {
+      try {
+        // Validate input using Zod
+        const zodResult = createIssueSchema.safeParse(input);
+        if (!zodResult.success) {
+          const errorMessages = zodResult.error.issues
+            .map((issue) => issue.message)
+            .join(", ");
+          throw new GraphQLError(`Validation failed: ${errorMessages}`, {
+            extensions: {
+              code: "INVALID_INPUT",
+              validationErrors: zodResult.error.issues,
+            },
+          });
+        }
+
+        console.log("Context:", ctx);
+        console.log("User in context:", ctx.user);
+
+        if (!ctx.user) {
+          throw new GraphQLError(
+            "Unauthorized - Please provide a valid token",
+            {
+              extensions: { code: "UNAUTHORIZED" },
+            }
+          );
+        }
+
+        // Find the user in the database
+        const user = await prisma.user.findUnique({
+          where: { email: ctx.user.email },
+        });
+
+        if (!user) {
+          throw new GraphQLError("User not found", {
+            extensions: { code: "USER_NOT_FOUND" },
+          });
+        }
+
+        // Create the issue
+        const issue = await prisma.issue.create({
+          data: {
+            name: input.name,
+            content: input.content,
+            status: input.status,
+            userId: user.id,
+          },
+          include: {
+            user: true,
+          },
+        });
+
+        return {
+          id: issue.id,
+          name: issue.name,
+          content: issue.content,
+          status: issue.status as IssueStatus,
+          createdAt: issue.createdAt.toISOString(),
+          userId: issue.userId,
+          user: {
+            email: issue.user.email,
+            createdAt: issue.user.createdAt.toISOString(),
+            issues: [],
+            projects: [],
+          },
+        };
+      } catch (error) {
+        console.log(
+          "Create issue error:",
           error instanceof Error ? error.message : "Unknown error occurred"
         );
 
