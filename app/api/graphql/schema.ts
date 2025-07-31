@@ -50,11 +50,14 @@ input IssuesFilterInput {
 
 type Query {
   hello: String
-  me: User
+  me: User 
+  loginUser(input:AuthInput!):User
+  Issues:Issue!
 }
 
 type Mutation {
   createUser(input: AuthInput!): User
+  createIssue(input:CreateIssueInput!):Issue
 }
 `;
 
