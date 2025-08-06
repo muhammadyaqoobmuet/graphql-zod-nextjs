@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -22,27 +23,52 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import Link from "next/link";
+import { useUser } from "@/context/userContext";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const formSchema = z.object({
-  username: z.string().min(2, {
-    message: "Username must be at least 2 characters.",
+  email: z.string().email({
+    message: "Please enter a valid email address.",
   }),
   password: z.string().min(5).max(40),
 });
 
 const RegisterPage = () => {
+  const router = useRouter();
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const { username, password } = values;
+  const { user, signUpUser } = useUser() || {};
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    const { email, password } = values;
     console.log("Form submitted with values:", values);
+    setLoading(true);
+    setError("");
+    try {
+      await signUpUser?.(email, password);
+    } catch (error) {
+      console.error("Registration failed:", error);
+      setError("Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    if (user) {
+      console.log("User registered successfully, redirecting to dashboard");
+      router.push("/dashboard");
+    }
+  }, [user, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-yellow-100 px-4">
@@ -60,15 +86,16 @@ const RegisterPage = () => {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
-                name="username"
+                name="email"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-sm font-medium text-gray-700">
-                      Username
+                      Email
                     </FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Enter your username"
+                        type="email"
+                        placeholder="Enter your email"
                         className="h-11 border-gray-300 focus:border-yellow-500"
                         {...field}
                       />
@@ -97,11 +124,19 @@ const RegisterPage = () => {
                   </FormItem>
                 )}
               />
+
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+
               <Button
                 type="submit"
-                className="w-full h-11 bg-yellow-600 hover:bg-yellow-700 text-white font-medium"
+                disabled={loading}
+                className="w-full h-11 bg-yellow-600 hover:bg-yellow-700 text-white font-medium disabled:opacity-50"
               >
-                Create Account
+                {loading ? "Creating Account..." : "Create Account"}
               </Button>
             </form>
           </Form>

@@ -4,7 +4,6 @@ import * as z from "zod";
 
 import bcrypt from "bcryptjs";
 import { createToken } from "./lib/userAtuhentications";
-import { tr } from "zod/v4/locales";
 
 // Enums must be declared before use
 enum IssueStatus {
@@ -52,12 +51,22 @@ interface Project {
   userId: string;
 }
 
-interface User {
+export interface User {
+  id: string;
   email: string;
   createdAt: string;
   token?: string;
   issues: Issue[];
   projects: Project[];
+}
+
+interface UserBasic {
+  email: string;
+  createdAt: string;
+}
+
+interface Context {
+  user?: UserBasic & { id: string };
 }
 
 interface Issue {
@@ -67,18 +76,38 @@ interface Issue {
   status: IssueStatus;
   content: string;
   name: string;
-  user: User;
+  user?: UserBasic; // Use simpler user type to avoid circular reference
+  projectId: string | null;
 }
 
 export const resolver = {
+  Issue: {
+    user: async (parent: Issue) => {
+      // This only runs when user field is requested in the query
+      const user = await prisma.user.findUnique({
+        where: { id: parent.userId },
+      });
+
+      if (!user) return null;
+
+      return {
+        email: user.email,
+        createdAt: user.createdAt.toISOString(),
+      };
+    },
+  },
   Query: {
     Issues: async (_, args, ctx: any): Promise<Issue[]> => {
       // first check is this user authorized
       try {
-        if (!ctx.user && !ctx.user.email) {
-          throw new GraphQLError("UN_AUTHORIZED", {
-            extensions: { code: "UNAUTHORIZED" },
-          });
+        // Fixed: Proper authorization check
+        if (!ctx.user || !ctx.user.email) {
+          throw new GraphQLError(
+            "Unauthorized - Please provide a valid token",
+            {
+              extensions: { code: "UNAUTHORIZED" },
+            }
+          );
         }
 
         const email = ctx.user.email;
@@ -88,19 +117,41 @@ export const resolver = {
             email,
           },
           include: {
-            issues: true,
+            issues: {
+              include: {
+                user: true,
+              },
+            },
           },
         });
+
         if (!doesUserExits) {
           throw new GraphQLError("User does not exists", {
             extensions: { code: "USER_NOT_FOUND" },
           });
         }
+
         console.log(doesUserExits.issues);
-        return doesUserExits.issues.map((issue) => issue as Issue);
+
+        // Properly map Prisma issues to GraphQL Issue interface
+        return doesUserExits.issues.map((issue) => ({
+          id: issue.id,
+          name: issue.name,
+          content: issue.content,
+          status: issue.status as IssueStatus,
+          createdAt: issue.createdAt.toISOString(),
+          userId: issue.userId,
+          projectId: issue.projectId, // This can be null now
+        }));
       } catch (error) {
         console.error("Error fetching user issues:", error);
 
+        // If it's already a GraphQLError, rethrow it
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+
+        // Handle other types of errors
         const errorMessage =
           error instanceof Error
             ? error.message
@@ -110,10 +161,32 @@ export const resolver = {
         });
       }
     },
+
     hello: (): string => "Hello World!",
-    // me: (_, _, ctx: any): User => {
-    //   return ctx.user;
-    // },
+    me: async (_: unknown, __: unknown, ctx: Context): Promise<User> => {
+      if (!ctx.user) {
+        throw new Error("Unauthorized: No user found in context");
+      }
+      const email = ctx.user.email;
+      const user = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (!user) {
+        throw new GraphQLError("User not found", {
+          extensions: { code: "USER_NOT_FOUND" },
+        });
+      }
+
+      return {
+        id: user.id,
+        email: user.email,
+        createdAt: user.createdAt.toISOString(),
+        token: undefined, // Don't return token in me query for security
+        issues: [], // Will be populated by Issue resolver if needed
+        projects: [],
+      };
+    },
     loginUser: async (
       _parent: unknown,
       { input }: { input: AuthInput },
@@ -175,6 +248,7 @@ export const resolver = {
         const token = createToken({ email: input.email });
 
         return {
+          id: existsUser.id,
           email: existsUser.email,
           createdAt: existsUser.createdAt.toISOString(),
           token,
@@ -262,6 +336,7 @@ export const resolver = {
         const token = createToken({ email: input.email });
 
         return {
+          id: result.id,
           email: result.email,
           createdAt: result.createdAt.toISOString(),
           token,
@@ -353,11 +428,10 @@ export const resolver = {
           status: issue.status as IssueStatus,
           createdAt: issue.createdAt.toISOString(),
           userId: issue.userId,
+          projectId: issue.projectId, // This will be null from database
           user: {
             email: issue.user.email,
             createdAt: issue.user.createdAt.toISOString(),
-            issues: [],
-            projects: [],
           },
         };
       } catch (error) {
