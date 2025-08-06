@@ -19,10 +19,11 @@ type Issue {
   id: ID!
   createdAt: String!
   userId: String!
-  user: User!
+  user: User
   status: IssueStatus
   content: String!
   name: String!
+  projectId: String
 }
 
 input AuthInput {
@@ -52,7 +53,7 @@ type Query {
   hello: String
   me: User 
   loginUser(input:AuthInput!):User
-  Issues:Issue!
+  Issues:[Issue]!
 }
 
 type Mutation {
