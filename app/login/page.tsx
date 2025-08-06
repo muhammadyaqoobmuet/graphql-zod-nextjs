@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { email, z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,15 +22,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import Link from "next/link";
+import { useUser } from "@/context/userContext";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
   username: z.string().min(2, {
     message: "Username must be at least 2 characters.",
   }),
-  password: z.string().min(5).max(40),
+  password: z.string().min(2).max(40),
 });
 
 const Login = () => {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -38,11 +44,30 @@ const Login = () => {
       password: "",
     },
   });
+  const { loginUser, user } = useUser();
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     const { username, password } = values;
     console.log("Form submitted with values:", values);
+    setLoading(true);
+    setError("");
+    try {
+      await loginUser?.(username, password);
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Registration failed:", error);
+      setError("Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    if (user) {
+      console.log("User registered successfully, redirecting to dashboard");
+      router.push("/dashboard");
+    }
+  }, [user, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-yellow-100 px-4">

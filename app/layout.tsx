@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
 import { Providers } from "@/components/providers";
+import { Button } from "@/components/ui/button";
+import Logout from "@/components/logout/Logout";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,13 +32,14 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <nav className="p-4 border-b bg-yellow-100">
+          <nav className="p-4 border-b bg-yellow-100 flex justify-between items-center max-w-7xl mt-10 rounded-3xl mx-auto">
             <Link
               href="/"
-              className="text-lg font-medium bg-yellow-600 text-white px-4 py-2 hover:bg-yellow-700 transition-colors"
+              className="text-lg font-medium  text-black transition-colors"
             >
               Track Productivity
             </Link>
+            <Logout />
           </nav>
           {children}
         </Providers>

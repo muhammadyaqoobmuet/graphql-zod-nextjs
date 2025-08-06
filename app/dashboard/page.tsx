@@ -8,27 +8,10 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-//   useEffect(() => {
-//     const initializeUser = async () => {
-//       const token = localStorage.getItem("_productivity-track-token");
-//       if (!token) {
-//         router.push("/register");
-//         return;
-//       }
-//       if (loadUserFromToken) {
-//         await loadUserFromToken();
-//       }
-//       setIsLoading(false);
-//     };
+ 
+ 
 
-//     initializeUser();
-//   }, [loadUserFromToken, router]);
-
-//   console.log("Dashboard user:", user);
-
-//   if (isLoading) {
-//     return <div>Loading...</div>;
-//   }
+  
 
   if (!user) {
     return <div>Please log in to access dashboard</div>;

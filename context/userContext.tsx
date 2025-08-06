@@ -18,6 +18,23 @@ export function getCreateUserQuery(): DocumentNode {
   `;
   return CREATE_USER;
 }
+export function getLoginUserQuery(): DocumentNode {
+  const LOGIN_USER = gql`
+    query LoginUser($input: AuthInput!) {
+      loginUser(input: $input) {
+        email
+        token
+        issues {
+          name
+          id
+          status
+          content
+        }
+      }
+    }
+  `;
+  return LOGIN_USER;
+}
 
 export function getMeQuery(): DocumentNode {
   const ME_QUERY = gql`
@@ -93,11 +110,44 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const loginUser = async (email: string, password: string) => {
-    // TODO: Implement login functionality
-    console.log("Login not implemented yet");
+    setLoading(true);
+    setError(""); // Clear previous errors
+    try {
+      const { data } = await client.query({
+        query: getLoginUserQuery(),
+        variables: {
+          input: {
+            email,
+            password,
+          },
+        },
+      });
+
+      console.log("Full response data:", data);
+
+      const LoginUser = data?.loginUser;
+      if (LoginUser) {
+        // Store token in localStorage
+        localStorage.setItem("_productivity-track-token", LoginUser.token);
+        setUser(LoginUser);
+        console.log("User signed up:", LoginUser);
+      }
+    } catch (error: unknown) {
+      let errorMessage = "Unknown error occurred";
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      setError(errorMessage);
+      console.error("Error signing up user:", errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
 
   const logout = () => {
     setUser(null);
