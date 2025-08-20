@@ -20,8 +20,7 @@ const handler = startServerAndCreateNextHandler(server, {
     const authHeader = req.headers.get("authorization") || "";
     // console.log("Authorization header:", authHeader);
 
-    const user = verifyTokenAndDecodeIt(authHeader);
-    
+    const user = verifyTokenAndDecodeIt(authHeader);    
     return {
       req,
       user,

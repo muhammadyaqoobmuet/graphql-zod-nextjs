@@ -6,6 +6,7 @@ import { Providers } from "@/components/providers";
 import { Button } from "@/components/ui/button";
 import Logout from "@/components/logout/Logout";
 
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -26,21 +27,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <nav className="p-4 border-b bg-yellow-100 flex justify-between items-center max-w-7xl mt-10 rounded-3xl mx-auto">
-            <Link
-              href="/"
-              className="text-lg font-medium  text-black transition-colors"
-            >
-              Track Productivity
-            </Link>
-            <Logout />
-          </nav>
+          
           {children}
         </Providers>
       </body>
