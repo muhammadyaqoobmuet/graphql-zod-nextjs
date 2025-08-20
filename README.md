@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ProductivityPro
+
+A modern fullstack productivity dashboard built with Next.js, GraphQL, Prisma, Apollo Client, and shadcn/ui.
+
+## Features
+
+- User authentication (register, login, JWT)
+- Sleek dashboard with sidebar navigation
+- Project and issue management (dummy cards)
+- Responsive UI with shadcn/ui and Tailwind CSS
+- GraphQL API with Prisma ORM
 
 ## Getting Started
 
-First, run the development server:
+1. **Install dependencies:**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+   ```
+   npm install
+   ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Set up your environment:**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+   - Copy `.env.example` to `.env` and fill in your database and JWT secrets.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. **Run database migrations:**
 
-## Learn More
+   ```
+   npx prisma migrate dev
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+4. **Start the development server:**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   ```
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. **Open your browser:**
+   ```
+   http://localhost:3000
+   ```
 
-## Deploy on Vercel
+## Folder Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `/app` - Next.js app routes and pages
+- `/context` - React context for user authentication
+- `/components` - UI components (sidebar, cards, etc.)
+- `/api/graphql` - GraphQL schema, resolvers, and route
+- `/prisma` - Prisma schema and migrations
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Tech Stack
+
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS & shadcn/ui
+- Apollo Client & GraphQL
+- Prisma ORM & SQLite/Postgres
+
+---
+
+**Note:** This is a basic starter. Customize and extend as needed!
